@@ -1,35 +1,21 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { getSupabaseServerClient } from '../supabase'
+import { eq, asc } from 'drizzle-orm'
+import { db, videos } from '../db'
 
-// Get active videos (public)
-export const getActiveVideos = createServerFn({ method: 'GET' }).handler(
-  async () => {
-    const supabase = getSupabaseServerClient()
-    const { data, error } = await supabase
-      .from('videos')
-      .select('*')
-      .eq('is_active', true)
-      .order('display_order')
-
-    if (error) throw error
-    return data ?? []
+// Map to snake_case for frontend compatibility
+function mapVideo(video: typeof videos.$inferSelect) {
+  return {
+    id: video.id,
+    title: video.title,
+    description: video.description,
+    youtube_id: video.youtubeId,
+    display_order: video.displayOrder,
+    is_active: video.isActive,
+    created_at: video.createdAt,
+    updated_at: video.updatedAt,
   }
-)
-
-// Get all videos (admin)
-export const getAllVideos = createServerFn({ method: 'GET' }).handler(
-  async () => {
-    const supabase = getSupabaseServerClient()
-    const { data, error } = await supabase
-      .from('videos')
-      .select('*')
-      .order('display_order')
-
-    if (error) throw error
-    return data ?? []
-  }
-)
+}
 
 // Helper to extract YouTube video ID from various URL formats
 function extractYouTubeId(url: string): string | null {
@@ -45,31 +31,54 @@ function extractYouTubeId(url: string): string | null {
   return null
 }
 
+// Get active videos (public)
+export const getActiveVideos = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const videoList = await db
+      .select()
+      .from(videos)
+      .where(eq(videos.isActive, true))
+      .orderBy(asc(videos.displayOrder))
+
+    return videoList.map(mapVideo)
+  }
+)
+
+// Get all videos (admin)
+export const getAllVideos = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const videoList = await db
+      .select()
+      .from(videos)
+      .orderBy(asc(videos.displayOrder))
+
+    return videoList.map(mapVideo)
+  }
+)
+
 // Create video
 export const createVideo = createServerFn({ method: 'POST' })
   .inputValidator(
     z.object({
       title: z.string(),
       description: z.string().optional(),
-      youtube_url: z.string(), // Accept URL or ID
+      youtube_url: z.string(),
       display_order: z.number().optional(),
     })
   )
   .handler(async ({ data }) => {
-    const youtube_id = extractYouTubeId(data.youtube_url)
-    if (!youtube_id) {
+    const youtubeId = extractYouTubeId(data.youtube_url)
+    if (!youtubeId) {
       throw new Error('Invalid YouTube URL or ID')
     }
 
-    const supabase = getSupabaseServerClient()
-    const { error } = await supabase.from('videos').insert({
+    await db.insert(videos).values({
       title: data.title,
       description: data.description,
-      youtube_id,
-      display_order: data.display_order,
+      youtubeId,
+      displayOrder: data.display_order,
     })
 
-    if (error) throw error
     return { success: true }
   })
 
@@ -88,22 +97,27 @@ export const updateVideo = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { id, youtube_url, ...updates } = data
 
-    // If youtube_url provided, extract the ID
+    let youtubeId: string | undefined
     if (youtube_url) {
-      const youtube_id = extractYouTubeId(youtube_url)
-      if (!youtube_id) {
+      const extracted = extractYouTubeId(youtube_url)
+      if (!extracted) {
         throw new Error('Invalid YouTube URL or ID')
       }
-      ;(updates as Record<string, unknown>).youtube_id = youtube_id
+      youtubeId = extracted
     }
 
-    const supabase = getSupabaseServerClient()
-    const { error } = await supabase
-      .from('videos')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
+    await db
+      .update(videos)
+      .set({
+        ...(updates.title !== undefined && { title: updates.title }),
+        ...(updates.description !== undefined && { description: updates.description }),
+        ...(youtubeId !== undefined && { youtubeId }),
+        ...(updates.display_order !== undefined && { displayOrder: updates.display_order }),
+        ...(updates.is_active !== undefined && { isActive: updates.is_active }),
+        updatedAt: new Date(),
+      })
+      .where(eq(videos.id, id))
 
-    if (error) throw error
     return { success: true }
   })
 
@@ -111,9 +125,6 @@ export const updateVideo = createServerFn({ method: 'POST' })
 export const deleteVideo = createServerFn({ method: 'POST' })
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
-    const supabase = getSupabaseServerClient()
-    const { error } = await supabase.from('videos').delete().eq('id', data.id)
-
-    if (error) throw error
+    await db.delete(videos).where(eq(videos.id, data.id))
     return { success: true }
   })

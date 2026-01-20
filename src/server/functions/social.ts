@@ -1,33 +1,43 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { getSupabaseServerClient } from '../supabase'
+import { eq, asc } from 'drizzle-orm'
+import { db, socialLinks } from '../db'
+
+// Map to snake_case for frontend compatibility
+function mapSocialLink(link: typeof socialLinks.$inferSelect) {
+  return {
+    id: link.id,
+    platform: link.platform,
+    url: link.url,
+    display_order: link.displayOrder,
+    is_active: link.isActive,
+    created_at: link.createdAt,
+    updated_at: link.updatedAt,
+  }
+}
 
 // Get active social links (public)
 export const getSocialLinks = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const supabase = getSupabaseServerClient()
-    const { data, error } = await supabase
-      .from('social_links')
-      .select('*')
-      .eq('is_active', true)
-      .order('display_order')
+    const links = await db
+      .select()
+      .from(socialLinks)
+      .where(eq(socialLinks.isActive, true))
+      .orderBy(asc(socialLinks.displayOrder))
 
-    if (error) throw error
-    return data ?? []
+    return links.map(mapSocialLink)
   }
 )
 
 // Get all social links (admin)
 export const getAllSocialLinks = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const supabase = getSupabaseServerClient()
-    const { data, error } = await supabase
-      .from('social_links')
-      .select('*')
-      .order('display_order')
+    const links = await db
+      .select()
+      .from(socialLinks)
+      .orderBy(asc(socialLinks.displayOrder))
 
-    if (error) throw error
-    return data ?? []
+    return links.map(mapSocialLink)
   }
 )
 
@@ -41,10 +51,12 @@ export const createSocialLink = createServerFn({ method: 'POST' })
     })
   )
   .handler(async ({ data }) => {
-    const supabase = getSupabaseServerClient()
-    const { error } = await supabase.from('social_links').insert(data)
+    await db.insert(socialLinks).values({
+      platform: data.platform,
+      url: data.url,
+      displayOrder: data.display_order,
+    })
 
-    if (error) throw error
     return { success: true }
   })
 
@@ -61,13 +73,18 @@ export const updateSocialLink = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const { id, ...updates } = data
-    const supabase = getSupabaseServerClient()
-    const { error } = await supabase
-      .from('social_links')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
 
-    if (error) throw error
+    await db
+      .update(socialLinks)
+      .set({
+        ...(updates.platform !== undefined && { platform: updates.platform }),
+        ...(updates.url !== undefined && { url: updates.url }),
+        ...(updates.display_order !== undefined && { displayOrder: updates.display_order }),
+        ...(updates.is_active !== undefined && { isActive: updates.is_active }),
+        updatedAt: new Date(),
+      })
+      .where(eq(socialLinks.id, id))
+
     return { success: true }
   })
 
@@ -75,12 +92,6 @@ export const updateSocialLink = createServerFn({ method: 'POST' })
 export const deleteSocialLink = createServerFn({ method: 'POST' })
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
-    const supabase = getSupabaseServerClient()
-    const { error } = await supabase
-      .from('social_links')
-      .delete()
-      .eq('id', data.id)
-
-    if (error) throw error
+    await db.delete(socialLinks).where(eq(socialLinks.id, data.id))
     return { success: true }
   })

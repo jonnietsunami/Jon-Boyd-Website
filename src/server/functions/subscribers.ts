@@ -1,6 +1,19 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { getSupabaseServerClient } from '../supabase'
+import { eq, desc } from 'drizzle-orm'
+import { db, emailSubscribers } from '../db'
+
+// Map to snake_case for frontend compatibility
+function mapSubscriber(sub: typeof emailSubscribers.$inferSelect) {
+  return {
+    id: sub.id,
+    email: sub.email,
+    first_name: sub.firstName,
+    subscribed_at: sub.subscribedAt,
+    is_active: sub.isActive,
+    source: sub.source,
+  }
+}
 
 // Subscribe to email list (public)
 export const subscribeEmail = createServerFn({ method: 'POST' })
@@ -11,50 +24,53 @@ export const subscribeEmail = createServerFn({ method: 'POST' })
     })
   )
   .handler(async ({ data }) => {
-    const supabase = getSupabaseServerClient()
-    const { error } = await supabase.from('email_subscribers').upsert(
-      {
+    await db
+      .insert(emailSubscribers)
+      .values({
         email: data.email.toLowerCase(),
-        first_name: data.first_name,
-      },
-      { onConflict: 'email' }
-    )
+        firstName: data.first_name,
+      })
+      .onConflictDoUpdate({
+        target: emailSubscribers.email,
+        set: {
+          firstName: data.first_name,
+          isActive: true,
+        },
+      })
 
-    if (error) throw error
     return { success: true }
   })
 
 // Get all subscribers (admin)
 export const getSubscribers = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const supabase = getSupabaseServerClient()
-    const { data, error } = await supabase
-      .from('email_subscribers')
-      .select('*')
-      .order('subscribed_at', { ascending: false })
+    const subscribers = await db
+      .select()
+      .from(emailSubscribers)
+      .orderBy(desc(emailSubscribers.subscribedAt))
 
-    if (error) throw error
-    return data ?? []
+    return subscribers.map(mapSubscriber)
   }
 )
 
 // Export subscribers as CSV (admin)
 export const exportSubscribersCSV = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const supabase = getSupabaseServerClient()
-    const { data, error } = await supabase
-      .from('email_subscribers')
-      .select('email, first_name, subscribed_at')
-      .eq('is_active', true)
-      .order('subscribed_at', { ascending: false })
-
-    if (error) throw error
+    const subscribers = await db
+      .select({
+        email: emailSubscribers.email,
+        firstName: emailSubscribers.firstName,
+        subscribedAt: emailSubscribers.subscribedAt,
+      })
+      .from(emailSubscribers)
+      .where(eq(emailSubscribers.isActive, true))
+      .orderBy(desc(emailSubscribers.subscribedAt))
 
     // Format as CSV
     const csv = [
       'Email,First Name,Subscribed Date',
-      ...(data ?? []).map(
-        (s) => `${s.email},${s.first_name || ''},${s.subscribed_at}`
+      ...subscribers.map(
+        (s) => `${s.email},${s.firstName || ''},${s.subscribedAt?.toISOString() || ''}`
       ),
     ].join('\n')
 
@@ -66,12 +82,6 @@ export const exportSubscribersCSV = createServerFn({ method: 'GET' }).handler(
 export const deleteSubscriber = createServerFn({ method: 'POST' })
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
-    const supabase = getSupabaseServerClient()
-    const { error } = await supabase
-      .from('email_subscribers')
-      .delete()
-      .eq('id', data.id)
-
-    if (error) throw error
+    await db.delete(emailSubscribers).where(eq(emailSubscribers.id, data.id))
     return { success: true }
   })

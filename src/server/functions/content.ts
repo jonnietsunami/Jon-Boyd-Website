@@ -1,18 +1,23 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { getSupabaseServerClient } from '../supabase'
+import { eq } from 'drizzle-orm'
+import { db, siteContent } from '../db'
 
 // Get site content (bio, hero text)
 export const getSiteContent = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const supabase = getSupabaseServerClient()
-    const { data, error } = await supabase
-      .from('site_content')
-      .select('*')
-      .single()
+    const [content] = await db.select().from(siteContent).limit(1)
+    if (!content) throw new Error('Site content not found')
 
-    if (error) throw error
-    return data
+    // Map to snake_case for frontend compatibility
+    return {
+      id: content.id,
+      bio_text: content.bioText,
+      hero_title: content.heroTitle,
+      hero_subtitle: content.heroSubtitle,
+      created_at: content.createdAt,
+      updated_at: content.updatedAt,
+    }
   }
 )
 
@@ -26,12 +31,15 @@ export const updateSiteContent = createServerFn({ method: 'POST' })
     })
   )
   .handler(async ({ data }) => {
-    const supabase = getSupabaseServerClient()
-    const { error } = await supabase
-      .from('site_content')
-      .update({ ...data, updated_at: new Date().toISOString() })
-      .eq('id', '00000000-0000-0000-0000-000000000001')
+    await db
+      .update(siteContent)
+      .set({
+        ...(data.bio_text !== undefined && { bioText: data.bio_text }),
+        ...(data.hero_title !== undefined && { heroTitle: data.hero_title }),
+        ...(data.hero_subtitle !== undefined && { heroSubtitle: data.hero_subtitle }),
+        updatedAt: new Date(),
+      })
+      .where(eq(siteContent.id, '00000000-0000-0000-0000-000000000001'))
 
-    if (error) throw error
     return { success: true }
   })
