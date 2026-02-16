@@ -124,6 +124,19 @@ code {
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+@keyframes bounce-x {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(4px);
+  }
+}
+
+@utility animate-bounce-x {
+  animation: bounce-x 1.5s ease-in-out infinite;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

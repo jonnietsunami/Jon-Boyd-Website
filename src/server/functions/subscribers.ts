@@ -21,9 +21,12 @@ export const subscribeEmail = createServerFn({ method: 'POST' })
     z.object({
       email: z.string().email(),
       first_name: z.string().optional(),
+      website: z.string().optional(),
     })
   )
   .handler(async ({ data }) => {
+    if (data.website) return { success: true }
+
     await db
       .insert(emailSubscribers)
       .values({

@@ -29,6 +29,7 @@ const socialIcons: Record<string, React.ComponentType<{ className?: string }>> =
 function HomePage() {
   const { content, socialLinks } = Route.useLoaderData()
   const [email, setEmail] = useState('')
+  const [website, setWebsite] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubscribe = async (e: React.FormEvent) => {
@@ -37,7 +38,7 @@ function HomePage() {
 
     setIsSubmitting(true)
     try {
-      await subscribeEmail({ data: { email } })
+      await subscribeEmail({ data: { email, website } })
       toast.success('Subscribed!')
       setEmail('')
     } catch {
@@ -79,19 +80,25 @@ function HomePage() {
         </div>
 
         {/* Middle: Name */}
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex flex-col items-center justify-center">
           <h1 className="text-6xl md:text-8xl lg:text-9xl font-bold text-white tracking-tight">
             {content?.hero_title || 'JON BOYD'}
           </h1>
+          {content?.hero_subtitle && (
+            <p className="text-lg md:text-xl lg:text-2xl text-white/70 mt-4 tracking-wide text-center">
+              {content.hero_subtitle}
+            </p>
+          )}
         </div>
 
         {/* Bottom: Bio link + Email signup */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <Link
             to="/bio"
-            className="text-white/70 hover:text-white transition-colors text-lg"
+            className="group inline-flex items-center gap-3 text-white text-lg font-medium border border-white/30 rounded-full px-6 py-3 hover:bg-white hover:text-black transition-all duration-300"
           >
-            Bio & Videos →
+            Bio & Videos
+            <span className="inline-block animate-bounce-x -translate-y-px">→</span>
           </Link>
 
           <form
@@ -104,6 +111,16 @@ function HomePage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="bg-white/10 border-white/20 text-white placeholder:text-white/50 w-full md:w-64"
+            />
+            <input
+              type="text"
+              name="website"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+              className="absolute opacity-0 h-0 w-0 overflow-hidden pointer-events-none"
             />
             <Button
               type="submit"

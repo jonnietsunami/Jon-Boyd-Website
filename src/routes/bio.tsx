@@ -52,7 +52,7 @@ function BioPage() {
             <h1 className="text-5xl xl:text-6xl font-bold tracking-tight mb-4">
               Jon Boyd
             </h1>
-            <p className="text-base xl:text-lg text-white/80 leading-relaxed max-w-md">
+            <p className="text-base xl:text-lg text-white/80 leading-relaxed max-w-md whitespace-pre-wrap">
               {content?.bio_text || 'Bio coming soon...'}
             </p>
           </div>

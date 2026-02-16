@@ -31,6 +31,9 @@ export const updateSiteContent = createServerFn({ method: 'POST' })
     })
   )
   .handler(async ({ data }) => {
+    const [existing] = await db.select({ id: siteContent.id }).from(siteContent).limit(1)
+    if (!existing) throw new Error('Site content not found')
+
     await db
       .update(siteContent)
       .set({
@@ -39,7 +42,7 @@ export const updateSiteContent = createServerFn({ method: 'POST' })
         ...(data.hero_subtitle !== undefined && { heroSubtitle: data.hero_subtitle }),
         updatedAt: new Date(),
       })
-      .where(eq(siteContent.id, '00000000-0000-0000-0000-000000000001'))
+      .where(eq(siteContent.id, existing.id))
 
     return { success: true }
   })
