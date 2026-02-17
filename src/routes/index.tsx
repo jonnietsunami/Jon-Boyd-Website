@@ -2,8 +2,6 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { Instagram, Youtube, Twitter } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Button } from '../components/ui/button'
-import { Input } from '../components/ui/input'
 import { getSiteContent } from '../server/functions/content'
 import { getSocialLinks } from '../server/functions/social'
 import { subscribeEmail } from '../server/functions/subscribers'
@@ -92,48 +90,46 @@ function HomePage() {
         </div>
 
         {/* Bottom: Bio link + Email signup */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          <Link
-            to="/bio"
-            className="group inline-flex items-center gap-3 text-white text-lg font-medium border border-white/30 rounded-full px-6 py-3 hover:bg-white hover:text-black transition-all duration-300"
-          >
-            Bio & Videos
-            <span className="inline-block animate-bounce-x -translate-y-px">→</span>
-          </Link>
+        <div className="flex flex-col items-center md:items-stretch gap-2">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6 w-full">
+            <Link
+              to="/bio"
+              className="group inline-flex items-center gap-3 text-white text-lg font-medium border border-white/30 rounded-full px-6 py-3 hover:bg-white hover:text-black transition-all duration-300"
+            >
+              Bio & Videos
+              <span className="inline-block animate-bounce-x -translate-y-px">→</span>
+            </Link>
 
-          <form
-            onSubmit={handleSubscribe}
-            className="flex flex-col gap-2 w-full md:w-auto"
-          >
-            <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1 w-full md:w-auto">
-              <Input
-                type="email"
-                placeholder="Tickets. Drops. New ideas."
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/50 md:w-64"
+            <form onSubmit={handleSubscribe} className="w-full md:w-auto">
+              <div className="flex items-center bg-white/10 border border-white/20 rounded-full pl-5 pr-1.5 py-1.5">
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="bg-transparent text-white placeholder:text-white/50 text-sm outline-none w-full md:w-52"
+                />
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="rounded-full bg-white text-black hover:bg-white/90 text-sm font-medium px-4 py-1.5 shrink-0 transition-colors disabled:opacity-50"
+                >
+                  {isSubmitting ? '...' : 'Join'}
+                </button>
+              </div>
+              <input
+                type="text"
+                name="website"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                className="absolute opacity-0 h-0 w-0 overflow-hidden pointer-events-none"
               />
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                variant="secondary"
-                className="bg-white text-black hover:bg-white/90"
-              >
-                {isSubmitting ? '...' : 'Join Now'}
-              </Button>
-              <a className="text-sm text-white/50">* I will respect your inbox.  I promise</a>
-            </div>
-            <input
-              type="text"
-              name="website"
-              value={website}
-              onChange={(e) => setWebsite(e.target.value)}
-              tabIndex={-1}
-              autoComplete="off"
-              aria-hidden="true"
-              className="absolute opacity-0 h-0 w-0 overflow-hidden pointer-events-none"
-            />
-          </form>
+            </form>
+          </div>
+          <p className="text-xs text-white/40 text-right pr-3 self-end">* I respect your inbox</p>
         </div>
       </div>
     </main>
