@@ -90,7 +90,7 @@ function HomePage() {
         </div>
 
         {/* Bottom: Bio link + Email signup */}
-        <div className="flex flex-col items-center md:items-stretch gap-2">
+        <div className="flex flex-col items-center md:items-stretch gap-0.5">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6 w-full">
             <Link
               to="/bio"
