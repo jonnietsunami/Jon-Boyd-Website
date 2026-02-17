@@ -59,22 +59,29 @@ function HomePage() {
 
       {/* Content */}
       <div className="relative h-full flex flex-col justify-between p-6 md:p-12">
-        {/* Top: Social Icons */}
-        <div className="flex justify-end gap-4">
-          {socialLinks.map((link) => {
-            const Icon = socialIcons[link.platform.toLowerCase()]
-            return Icon ? (
-              <a
-                key={link.id}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-white/70 hover:text-white transition-colors"
-              >
-                <Icon className="w-6 h-6" />
-              </a>
-            ) : null
-          })}
+        {/* Top: Logo + Social Icons */}
+        <div className="flex items-center justify-between">
+          <img
+            src="/bullshitjonbwsmile.png"
+            alt="Boyd!"
+            className="h-10 md:h-12 w-auto mix-blend-lighten hover:scale-105 transition-transform"
+          />
+          <div className="flex gap-4">
+            {socialLinks.map((link) => {
+              const Icon = socialIcons[link.platform.toLowerCase()]
+              return Icon ? (
+                <a
+                  key={link.id}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white/70 hover:text-white transition-colors"
+                >
+                  <Icon className="w-6 h-6" />
+                </a>
+              ) : null
+            })}
+          </div>
         </div>
 
         {/* Middle: Name */}
