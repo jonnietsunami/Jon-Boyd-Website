@@ -103,15 +103,26 @@ function HomePage() {
 
           <form
             onSubmit={handleSubscribe}
-            className="flex gap-2 w-full md:w-auto"
+            className="flex flex-col gap-2 w-full md:w-auto"
           >
-            <Input
-              type="email"
-              placeholder="Get updates"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/50 w-full md:w-64"
-            />
+            <div className="grid grid-cols-[1fr_auto] gap-x-2 gap-y-1 w-full md:w-auto">
+              <Input
+                type="email"
+                placeholder="Tickets. Drops. New ideas."
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/50 md:w-64"
+              />
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                variant="secondary"
+                className="bg-white text-black hover:bg-white/90"
+              >
+                {isSubmitting ? '...' : 'Join Now'}
+              </Button>
+              <a className="text-sm text-white/50">* I will respect your inbox.  I promise</a>
+            </div>
             <input
               type="text"
               name="website"
@@ -122,14 +133,6 @@ function HomePage() {
               aria-hidden="true"
               className="absolute opacity-0 h-0 w-0 overflow-hidden pointer-events-none"
             />
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              variant="secondary"
-              className="bg-white text-black hover:bg-white/90"
-            >
-              {isSubmitting ? '...' : 'Subscribe'}
-            </Button>
           </form>
         </div>
       </div>
