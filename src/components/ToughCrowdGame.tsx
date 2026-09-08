@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ClubStage, Crowd, JonSprite, PopcornSprite, TomatoSprite } from './tough-crowd/Artwork'
+import './tough-crowd/game.css'
 
 type Tomato = { id: number; x: number; y: number; vx: number; vy: number }
 type Popcorn = { id: number; x: number; y: number }
@@ -165,66 +167,36 @@ export function ToughCrowdGame() {
   const ss = String(simRemaining % 60).padStart(2, '0')
 
   return (
-    <main className="min-h-screen bg-[#120d0b] text-[#fff3dc] px-3 py-5 md:px-8 md:py-8 flex items-center justify-center">
+    <main className="tc-game min-h-screen px-3 py-5 md:px-8 md:py-8 flex items-center justify-center">
       <div className="w-full max-w-5xl">
-        <div className="text-center mb-4">
+        <div className="tc-title text-center mb-4">
           <h1 className="text-4xl md:text-7xl font-black tracking-tight text-[#f7c56d]">TOUGH CROWD</h1>
           <p className="text-xs md:text-sm tracking-[0.35em] text-white/60 mt-1">A JON BOYD GAME</p>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 mb-2 text-[11px] md:text-sm font-bold tracking-wider">
-          <div className="bg-[#1b1513] border border-white/10 rounded-lg p-2">SCORE<br /><span className="text-lg md:text-2xl">{score}</span></div>
+        <div className="tc-hud grid grid-cols-3 gap-2 mb-2 text-[11px] md:text-sm font-bold tracking-wider">
+          <div className="bg-[#1b1513] border border-white/10 rounded-lg p-2">SCORE<br /><span className="text-lg md:text-2xl">{String(score).padStart(6, '0')}</span></div>
           <div className="bg-[#1b1513] border border-white/10 rounded-lg p-2 text-center">{ROUND_LABELS[round]}<br /><span className="text-lg md:text-2xl">{mm}:{ss}</span></div>
           <div className="bg-[#1b1513] border border-white/10 rounded-lg p-2 text-right">PATIENCE<br /><span className="text-lg md:text-2xl">{'❤'.repeat(Math.max(0, lives))}{'♡'.repeat(Math.max(0, 3 - lives))}</span></div>
         </div>
 
         <div
           ref={arenaRef}
-          className="relative overflow-hidden rounded-xl border-4 border-[#2b1b15] bg-[#5b2b1f] aspect-[16/10] select-none touch-none"
+          className="tc-arena relative overflow-hidden aspect-[16/10] select-none touch-none"
         >
-          <div className="absolute inset-0 opacity-70" style={{ backgroundImage: 'linear-gradient(#6f392a 2px, transparent 2px), linear-gradient(90deg, #6f392a 2px, transparent 2px)', backgroundSize: '48px 24px' }} />
-          <div className="absolute left-1/2 -translate-x-1/2 top-0 w-[48%] h-[78%] bg-[radial-gradient(ellipse_at_top,rgba(255,220,150,.45),transparent_70%)]" />
-          <div className="absolute bottom-0 inset-x-0 h-[27%] bg-[#2c1b14] border-t-4 border-[#120d0b]" />
-
-          <div className="absolute bottom-[19%] left-[14%] w-2 h-24 bg-[#171717] rounded-full" />
-          <div className="absolute bottom-[19%] left-[13.4%] w-5 h-2 bg-[#171717]" />
-          <div className="absolute bottom-[18%] right-[16%] w-16 h-2 bg-[#3a2419]" />
-          <div className="absolute bottom-[20%] right-[18%] w-2 h-16 bg-[#3a2419]" />
-          <div className="absolute bottom-[19%] right-[10%] w-3 h-8 bg-[#d6e8ef] border border-white/50 rounded-sm" />
-
-          {heckle && (
-            <div className="absolute z-30 left-1/2 top-[10%] -translate-x-1/2 bg-white text-black font-black text-xs md:text-lg px-4 py-2 rounded-xl border-4 border-black shadow-lg">{heckle}</div>
-          )}
-
+          <ClubStage />
+          {heckle && <div role="status" className="tc-heckle">{heckle}</div>}
           {tomatoes.map((t) => (
-            <div key={t.id} className="absolute z-20 text-xl md:text-3xl" style={{ left: `${t.x}%`, bottom: `${t.y}%`, transform: 'translate(-50%, 50%)' }}>🍅</div>
+            <div key={t.id} className="tc-tomato" style={{ left: `${t.x}%`, top: `${t.y}%` }}><TomatoSprite /></div>
           ))}
           {popcorn.map((p) => (
-            <div key={p.id} className="absolute z-20 text-2xl md:text-4xl animate-bounce" style={{ left: `${p.x}%`, bottom: `${p.y}%`, transform: 'translate(-50%, 50%)' }}>🍿</div>
+            <div key={p.id} className="tc-popcorn" style={{ left: `${p.x}%`, top: `${p.y}%` }}><PopcornSprite /></div>
           ))}
-
-          <div className="absolute z-20 bottom-[18%] -translate-x-1/2" style={{ left: `${playerX}%` }}>
-            <div className="relative w-14 h-24 md:w-20 md:h-32">
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-8 md:w-10 md:h-10 rounded-full bg-[#7b4c35] border-[3px] border-black" />
-              <div className="absolute top-3 md:top-4 left-1/2 -translate-x-1/2 w-8 h-2 bg-black rounded" />
-              <div className="absolute top-8 md:top-10 left-1/2 -translate-x-1/2 w-10 h-10 md:w-14 md:h-14 bg-black border-[3px] border-[#0b0b0b] rounded-sm" />
-              <div className="absolute top-[4.6rem] md:top-[6rem] left-[17%] w-3 h-10 md:h-14 bg-[#6fa2c7] border-2 border-black rotate-3" />
-              <div className="absolute top-[4.6rem] md:top-[6rem] right-[17%] w-3 h-10 md:h-14 bg-[#6fa2c7] border-2 border-black -rotate-3" />
-              <div className="absolute top-10 md:top-14 right-0 w-2 h-12 bg-[#7b4c35] rotate-[-12deg]" />
-              <div className="absolute top-10 md:top-14 -right-2 w-1 h-14 bg-[#222]" />
-              <div className="absolute bottom-0 left-[10%] w-6 h-3 bg-white border-2 border-black" />
-              <div className="absolute bottom-0 right-[10%] w-6 h-3 bg-white border-2 border-black" />
-            </div>
-          </div>
-
-          <div className="absolute bottom-0 inset-x-0 h-[15%] flex items-end justify-around px-3 z-10 pointer-events-none">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="w-[8%] max-w-16 aspect-square rounded-t-full bg-[#0d0b0b] border-t border-white/5" style={{ height: `${45 + (i % 3) * 15}%` }} />
-            ))}
-          </div>
+          <div className="tc-player" style={{ left: `${playerX}%` }}><JonSprite /></div>
+          <Crowd />
 
           {!started && !gameOver && !won && (
-            <div className="absolute inset-0 z-40 bg-black/60 flex flex-col items-center justify-center text-center p-6">
+            <div className="tc-overlay absolute inset-0 z-40 bg-black/60 flex flex-col items-center justify-center text-center p-6">
               <h2 className="text-3xl md:text-5xl font-black">SURVIVE THE SET</h2>
               <p className="mt-3 text-sm md:text-lg text-white/75 max-w-xl">Move left and right. Dodge tomatoes. Grab popcorn to restore the crowd's patience.</p>
               <button onClick={() => setStarted(true)} className="mt-6 bg-[#f7c56d] text-black font-black px-7 py-3 rounded-lg text-lg hover:scale-105 transition">START SET</button>
@@ -232,8 +204,8 @@ export function ToughCrowdGame() {
           )}
 
           {(gameOver || won) && (
-            <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center text-center p-6">
-              <h2 className="text-3xl md:text-5xl font-black text-[#f7c56d]">{won ? 'YOU KILLED. 🎤' : 'BOOED OFF STAGE 🍅'}</h2>
+            <div className="tc-overlay absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center text-center p-6">
+              <h2 className="text-3xl md:text-5xl font-black text-[#f7c56d]">{won ? 'YOU KILLED.' : 'BOOED OFF STAGE'}</h2>
               <p className="mt-3 text-lg">FINAL SCORE: <strong>{score}</strong></p>
               <p className="text-white/60">ROUND: {ROUND_LABELS[round]}</p>
               <button onClick={resetGame} className="mt-6 bg-white text-black font-black px-6 py-3 rounded-lg">PLAY AGAIN</button>
