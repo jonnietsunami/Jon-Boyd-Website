@@ -1,0 +1,30 @@
+import { afterEach, expect, test, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { ScoreDialog } from './ScoreDialog'
+const api = vi.hoisted(() => ({ getGameLeaderboard: vi.fn(), submitGameScore: vi.fn() }))
+vi.mock('../../server/functions/leaderboard', () => api)
+afterEach(() => { cleanup(); vi.resetAllMocks() })
+test('normalizes initials, saves email privately and defaults marketing to off', async () => {
+  api.getGameLeaderboard.mockResolvedValue([{ initials: 'ABC', score: 500 }])
+  api.submitGameScore.mockResolvedValue({success:true})
+  render(<ScoreDialog score={500} won={false} onRestart={() => {}} />)
+  fireEvent.change(screen.getByLabelText('3-letter initials'), { target: { value: 'a1bc' } })
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'player@example.com' } })
+  fireEvent.submit(screen.getByRole('button', {name:'JOIN THE LEADERBOARD'}).closest('form')!)
+  await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Score saved'))
+  expect(api.submitGameScore.mock.calls[0][0].data).toMatchObject({initials:'ABC', email:'player@example.com', score:500, subscribe:false})
+  expect(screen.queryByText('player@example.com')).toBeNull()
+})
+test('failed save retains details and reuses submission ID on retry', async () => {
+  api.getGameLeaderboard.mockRejectedValue(new Error('offline'))
+  api.submitGameScore.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({success:true})
+  render(<ScoreDialog score={90} won={false} onRestart={() => {}} />)
+  fireEvent.change(screen.getByLabelText('3-letter initials'), {target:{value:'JON'}})
+  fireEvent.change(screen.getByLabelText('Email'), {target:{value:'player@example.com'}})
+  fireEvent.submit(screen.getByRole('button', {name:'JOIN THE LEADERBOARD'}).closest('form')!)
+  await screen.findByRole('alert')
+  expect((screen.getByLabelText('Email') as HTMLInputElement).value).toBe('player@example.com')
+  fireEvent.submit(screen.getByRole('button', {name:'JOIN THE LEADERBOARD'}).closest('form')!)
+  await waitFor(() => expect(api.submitGameScore).toHaveBeenCalledTimes(2))
+  expect(api.submitGameScore.mock.calls[0][0].data.id).toBe(api.submitGameScore.mock.calls[1][0].data.id)
+})

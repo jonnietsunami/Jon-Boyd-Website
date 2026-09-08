@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ClubStage, Crowd, JonSprite, PopcornSprite, TomatoSprite } from './tough-crowd/Artwork'
+import { PopcornSprite, TomatoSprite } from './tough-crowd/Artwork'
 import './tough-crowd/game.css'
+import { throwPosition, throwHits } from './tough-crowd/trajectory'
+import { ScoreDialog } from './tough-crowd/ScoreDialog'
 
-type Tomato = { id: number; x: number; y: number; vx: number; vy: number }
+type Tomato = { id: number; x: number; y: number; startX: number; targetX: number; age: number; duration: number }
 type Popcorn = { id: number; x: number; y: number }
 
 const ROUND_LENGTH = 45
@@ -24,6 +26,11 @@ export function ToughCrowdGame() {
   const [tomatoes, setTomatoes] = useState<Tomato[]>([])
   const [popcorn, setPopcorn] = useState<Popcorn[]>([])
   const [heckle, setHeckle] = useState('')
+  const playerPosition = useRef(50)
+  const [moving, setMoving] = useState(false)
+  const [hit, setHit] = useState(false)
+  const hitTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(hitTimer.current), [])
 
   const heckles = useMemo(
     () => [
@@ -43,6 +50,11 @@ export function ToughCrowdGame() {
     setScore(0)
     setLives(3)
     setPlayerX(50)
+    playerPosition.current = 50
+    keys.current = { left: false, right: false }
+    setMoving(false)
+    setHit(false)
+    clearTimeout(hitTimer.current)
     setTomatoes([])
     setPopcorn([])
     setHeckle('')
@@ -50,6 +62,8 @@ export function ToughCrowdGame() {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement)?.matches('input, textarea')) return
+      if (['ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault()
       if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') keys.current.left = true
       if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') keys.current.right = true
     }
@@ -57,9 +71,12 @@ export function ToughCrowdGame() {
       if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') keys.current.left = false
       if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') keys.current.right = false
     }
+    const blur = () => { keys.current = { left: false, right: false } }
+    window.addEventListener('blur', blur)
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     return () => {
+      window.removeEventListener('blur', blur)
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
@@ -92,46 +109,52 @@ export function ToughCrowdGame() {
       last = now
       spawnClock += dt
 
+      setMoving(keys.current.left !== keys.current.right)
       setPlayerX((x) => {
         let next = x
         if (keys.current.left) next -= 42 * dt
         if (keys.current.right) next += 42 * dt
-        return Math.max(7, Math.min(93, next))
+        playerPosition.current = Math.max(9, Math.min(91, next))
+        return playerPosition.current
       })
 
       const spawnEvery = [0.95, 0.7, 0.5][round]
       if (spawnClock >= spawnEvery) {
         spawnClock = 0
         const startX = 8 + Math.random() * 84
-        const targetX = playerX + (Math.random() - 0.5) * [18, 12, 8][round]
+        const targetX = playerPosition.current + (Math.random() - 0.5) * [18, 12, 8][round]
         setTomatoes((ts) => [
           ...ts,
           {
             id: tomatoId.current++,
             x: startX,
-            y: 8,
-            vx: (targetX - startX) * 0.55,
-            vy: 52 + round * 6 + Math.random() * 8,
+            y: 82,
+            startX, targetX, age: 0, duration: [1.35, 1.15, 0.95][round],
           },
         ])
       }
 
       setTomatoes((ts) =>
         ts
-          .map((t) => ({ ...t, x: t.x + t.vx * dt, y: t.y + t.vy * dt }))
-          .filter((t) => t.y < 96),
+          .map((t) => {
+            const age = t.age + dt
+            const progress = Math.min(age / t.duration, 1)
+            // Throws originate at audience hands and arc onto the stage.
+            return { ...t, age, ...throwPosition(t.startX, t.targetX, progress) }
+          })
+          .filter((t) => t.age < t.duration + 0.08),
       )
 
       raf = requestAnimationFrame(frame)
     }
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
-  }, [started, gameOver, won, round, playerX])
+  }, [started, gameOver, won, round])
 
   useEffect(() => {
     if (!started || gameOver || won) return
     for (const t of tomatoes) {
-      if (Math.abs(t.x - playerX) < 4.2 && t.y > 67 && t.y < 84) {
+      if (throwHits(t.x, playerX, t.age, t.duration)) {
         setTomatoes((ts) => ts.filter((x) => x.id !== t.id))
         setLives((l) => {
           const next = l - 1
@@ -139,9 +162,11 @@ export function ToughCrowdGame() {
           return next
         })
         setHeckle(heckles[round][Math.floor(Math.random() * heckles[round].length)])
-        window.setTimeout(() => setHeckle(''), 1100)
+        setHit(true)
+        clearTimeout(hitTimer.current)
+        hitTimer.current = setTimeout(() => { setHeckle(''); setHit(false) }, 1100)
         if (lives > 1 && Math.random() < 0.45) {
-          setPopcorn((p) => [...p, { id: popcornId.current++, x: 12 + Math.random() * 76, y: 72 }])
+          setPopcorn((p) => [...p, { id: popcornId.current++, x: 12 + Math.random() * 76, y: 49 }])
         }
         break
       }
@@ -151,7 +176,7 @@ export function ToughCrowdGame() {
   useEffect(() => {
     if (!started || gameOver || won) return
     for (const p of popcorn) {
-      if (Math.abs(p.x - playerX) < 5 && Math.abs(p.y - 72) < 8) {
+      if (Math.abs(p.x - playerX) < 5 && Math.abs(p.y - 49) < 8) {
         setPopcorn((items) => items.filter((x) => x.id !== p.id))
         setLives((l) => Math.min(3, l + 1))
         setScore((s) => s + 150)
@@ -184,16 +209,15 @@ export function ToughCrowdGame() {
           ref={arenaRef}
           className="tc-arena relative overflow-hidden aspect-[16/10] select-none touch-none"
         >
-          <ClubStage />
+          <img src="/game/club-v2.png" alt="" className="tc-stage" draggable={false} />
           {heckle && <div role="status" className="tc-heckle">{heckle}</div>}
           {tomatoes.map((t) => (
-            <div key={t.id} className="tc-tomato" style={{ left: `${t.x}%`, top: `${t.y}%` }}><TomatoSprite /></div>
+            <div key={t.id} className="tc-tomato" style={{ left: `${t.x}%`, top: `${t.y}%`, scale: 1.3 - 0.5 * Math.min(t.age / t.duration, 1), rotate: `${t.age * 220}deg` }}><TomatoSprite /></div>
           ))}
           {popcorn.map((p) => (
             <div key={p.id} className="tc-popcorn" style={{ left: `${p.x}%`, top: `${p.y}%` }}><PopcornSprite /></div>
           ))}
-          <div className="tc-player" style={{ left: `${playerX}%` }}><JonSprite /></div>
-          <Crowd />
+          <div className={`tc-player ${moving && started && !gameOver && !won ? "tc-walking" : ""} ${hit ? "tc-hit" : ""}`} style={{ left: `${playerX}%` }}><img src="/game/jon-v2.png" alt="Jon Boyd" className="tc-jon-art" draggable={false} /></div>
 
           {!started && !gameOver && !won && (
             <div className="tc-overlay absolute inset-0 z-40 bg-black/60 flex flex-col items-center justify-center text-center p-6">
@@ -203,20 +227,11 @@ export function ToughCrowdGame() {
             </div>
           )}
 
-          {(gameOver || won) && (
-            <div className="tc-overlay absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center text-center p-6">
-              <h2 className="text-3xl md:text-5xl font-black text-[#f7c56d]">{won ? 'YOU KILLED.' : 'BOOED OFF STAGE'}</h2>
-              <p className="mt-3 text-lg">FINAL SCORE: <strong>{score}</strong></p>
-              <p className="text-white/60">ROUND: {ROUND_LABELS[round]}</p>
-              <button onClick={resetGame} className="mt-6 bg-white text-black font-black px-6 py-3 rounded-lg">PLAY AGAIN</button>
-              <p className="text-xs text-white/40 mt-3">Score saving + leaderboard comes next.</p>
-            </div>
-          )}
-
           <button
             type="button"
             aria-label="Move left"
-            onPointerDown={() => (keys.current.left = true)}
+            onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); keys.current.left = true }}
+            onPointerCancel={() => (keys.current.left = false)}
             onPointerUp={() => (keys.current.left = false)}
             onPointerLeave={() => (keys.current.left = false)}
             className="absolute z-30 left-0 bottom-0 w-1/2 h-full opacity-0 md:hidden"
@@ -224,7 +239,8 @@ export function ToughCrowdGame() {
           <button
             type="button"
             aria-label="Move right"
-            onPointerDown={() => (keys.current.right = true)}
+            onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); keys.current.right = true }}
+            onPointerCancel={() => (keys.current.right = false)}
             onPointerUp={() => (keys.current.right = false)}
             onPointerLeave={() => (keys.current.right = false)}
             className="absolute z-30 right-0 bottom-0 w-1/2 h-full opacity-0 md:hidden"
@@ -236,6 +252,7 @@ export function ToughCrowdGame() {
           <span>Mobile: hold left/right side of stage</span>
         </div>
       </div>
+      {(gameOver || won) && <ScoreDialog score={score} won={won} onRestart={resetGame} />}
     </main>
   )
 }
