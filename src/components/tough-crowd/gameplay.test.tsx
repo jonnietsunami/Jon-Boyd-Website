@@ -1,0 +1,54 @@
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import * as trajectory from './trajectory'
+import { ToughCrowdGame } from '../ToughCrowdGame'
+const audio = vi.hoisted(() => ({play:vi.fn(), unlock:vi.fn(async()=>{}), toggle:vi.fn(), muted:false}))
+vi.mock('./useArcadeAudio', () => ({useArcadeAudio:()=>audio}))
+vi.mock('./ScoreDialog', () => ({ScoreDialog:()=> <div>Score entry</div>}))
+beforeEach(() => { vi.useFakeTimers(); vi.spyOn(Math,'random').mockReturnValue(0) })
+afterEach(() => {cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); audio.play.mockClear()})
+async function advance(ms:number) {
+  for(let elapsed=0; elapsed<ms; elapsed+=50) await act(async()=>{vi.advanceTimersByTime(Math.min(50,ms-elapsed))})
+}
+async function start() { render(<ToughCrowdGame />); await act(async()=>fireEvent.click(screen.getByRole('button',{name:'START SET'}))) }
+test('warns before launch and offers popcorn without taking damage', async()=>{
+  await start(); await advance(1100)
+  expect(document.querySelector('.tc-throw-warning')).not.toBeNull()
+  expect(document.querySelector('.tc-tomato')).toBeNull()
+  await advance(500)
+  expect(document.querySelector('.tc-tomato')).not.toBeNull()
+  await advance(3700)
+  expect(screen.getByText('❤❤❤')).not.toBeNull()
+  expect(document.querySelector('.tc-popcorn')).not.toBeNull()
+})
+test('closely spaced hits cannot remove a second heart during recovery', async()=>{
+  vi.mocked(Math.random).mockReturnValue(.5)
+  await start(); await advance(3000)
+  expect(screen.getByText('❤❤♡')).not.toBeNull()
+  expect(screen.getByAltText('Jon Boyd wincing')).not.toBeNull()
+  await advance(800)
+  expect(screen.getByText('❤❤♡')).not.toBeNull()
+  expect(audio.play.mock.calls.filter(([cue])=>cue==='splat')).toHaveLength(1)
+})
+test('clearing a round cheers, clears threats and pauses scoring before the next set', async()=>{
+  vi.spyOn(trajectory, 'throwHits').mockReturnValue(false)
+  await start(); await advance(45000)
+  expect(screen.getByText('OPENER CLEARED')).not.toBeNull()
+  expect(audio.play.mock.calls.filter(([cue])=>cue==='cheer')).toHaveLength(1)
+  expect(document.querySelector('.tc-tomato')).toBeNull()
+  expect(screen.getByText('000450')).not.toBeNull()
+  await advance(2100)
+  expect(screen.getByText('000450')).not.toBeNull()
+  await advance(200)
+  expect(screen.queryByText('OPENER CLEARED')).toBeNull()
+  expect(screen.getByText('FEATURE')).not.toBeNull()
+  await advance(44900)
+  expect(screen.getByText('FEATURE CLEARED')).not.toBeNull()
+  await advance(2200)
+  await advance(45000)
+  expect(screen.getByText('HEADLINER CLEARED')).not.toBeNull()
+  expect(audio.play.mock.calls.filter(([cue])=>cue==='cheer')).toHaveLength(3)
+  await advance(2300)
+  expect(screen.getByText('Score entry')).not.toBeNull()
+  expect(screen.getByText('001350')).not.toBeNull()
+})
