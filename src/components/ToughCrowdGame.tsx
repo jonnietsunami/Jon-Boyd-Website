@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { PopcornSprite, TomatoSprite } from './tough-crowd/Artwork'
 import './tough-crowd/game.css'
 import { throwPosition, throwHits } from './tough-crowd/trajectory'
+import { Impact, type ImpactEvent } from './tough-crowd/Impact'
+import { useArcadeAudio } from './tough-crowd/useArcadeAudio'
 import { ScoreDialog } from './tough-crowd/ScoreDialog'
 
 type Tomato = { id: number; x: number; y: number; startX: number; targetX: number; age: number; duration: number }
@@ -11,6 +13,16 @@ const ROUND_LENGTH = 45
 const ROUND_LABELS = ['OPENER', 'FEATURE', 'HEADLINER']
 
 export function ToughCrowdGame() {
+  const { muted, toggle, unlock, play } = useArcadeAudio()
+  const [impacts, setImpacts] = useState<ImpactEvent[]>([])
+  const [resultReady, setResultReady] = useState(false)
+  const impactId = useRef(0)
+  const resolvedTomatoes = useRef(new Set<number>())
+  const resolvedPopcorn = useRef(new Set<number>())
+  useEffect(() => {
+    const timer = window.setInterval(() => setImpacts(items => items.length ? items.filter(item => Date.now() - item.created < 700) : items), 150)
+    return () => clearInterval(timer)
+  }, [])
   const arenaRef = useRef<HTMLDivElement>(null)
   const keys = useRef({ left: false, right: false })
   const tomatoId = useRef(0)
@@ -18,6 +30,11 @@ export function ToughCrowdGame() {
   const [started, setStarted] = useState(false)
   const [gameOver, setGameOver] = useState(false)
   const [won, setWon] = useState(false)
+  useEffect(() => {
+    if (!gameOver && !won) return
+    const timer = setTimeout(() => { setResultReady(true); play(won ? 'win' : 'lose') }, 700)
+    return () => clearTimeout(timer)
+  }, [gameOver, won, play])
   const [round, setRound] = useState(0)
   const [timeLeft, setTimeLeft] = useState(ROUND_LENGTH)
   const [score, setScore] = useState(0)
@@ -42,6 +59,10 @@ export function ToughCrowdGame() {
   )
 
   const resetGame = () => {
+    setImpacts([])
+    setResultReady(false)
+    resolvedTomatoes.current.clear()
+    resolvedPopcorn.current.clear()
     setStarted(false)
     setGameOver(false)
     setWon(false)
@@ -154,6 +175,12 @@ export function ToughCrowdGame() {
   useEffect(() => {
     if (!started || gameOver || won) return
     for (const t of tomatoes) {
+      if (t.age < t.duration || resolvedTomatoes.current.has(t.id)) continue
+      resolvedTomatoes.current.add(t.id)
+      const landedHit = throwHits(t.x, playerX, t.age, t.duration)
+      setImpacts(items => [...items, { id: impactId.current++, x: t.x, y: landedHit ? 39 : 52, kind: landedHit ? 'hit' : 'miss', created: Date.now() }])
+      play(landedHit ? 'splat' : 'miss')
+      setTomatoes(items => items.filter(item => item.id !== t.id))
       if (throwHits(t.x, playerX, t.age, t.duration)) {
         setTomatoes((ts) => ts.filter((x) => x.id !== t.id))
         setLives((l) => {
@@ -171,19 +198,23 @@ export function ToughCrowdGame() {
         break
       }
     }
-  }, [tomatoes, playerX, started, gameOver, won, round, heckles, lives])
+  }, [tomatoes, playerX, started, gameOver, won, round, heckles, lives, play])
 
   useEffect(() => {
     if (!started || gameOver || won) return
     for (const p of popcorn) {
+      if (resolvedPopcorn.current.has(p.id)) continue
       if (Math.abs(p.x - playerX) < 5 && Math.abs(p.y - 49) < 8) {
+        resolvedPopcorn.current.add(p.id)
+        play('pickup')
+        setImpacts(items => [...items, {id: impactId.current++, x: p.x, y: 40, kind: 'pickup', created: Date.now()}])
         setPopcorn((items) => items.filter((x) => x.id !== p.id))
         setLives((l) => Math.min(3, l + 1))
         setScore((s) => s + 150)
         break
       }
     }
-  }, [popcorn, playerX, started, gameOver, won])
+  }, [popcorn, playerX, started, gameOver, won, play])
 
   const simulated = round === 0 ? 5 : round === 1 ? 10 : 20
   const elapsed = ROUND_LENGTH - timeLeft
@@ -199,6 +230,7 @@ export function ToughCrowdGame() {
           <p className="text-xs md:text-sm tracking-[0.35em] text-white/60 mt-1">A JON BOYD GAME</p>
         </div>
 
+        <div className="tc-sound-row"><button type="button" onClick={toggle} aria-pressed={!muted} aria-label={muted ? 'Turn sound on' : 'Mute sound'}>{muted ? 'SOUND: OFF' : 'SOUND: ON'}</button></div>
         <div className="tc-hud grid grid-cols-3 gap-2 mb-2 text-[11px] md:text-sm font-bold tracking-wider">
           <div className="bg-[#1b1513] border border-white/10 rounded-lg p-2">SCORE<br /><span className="text-lg md:text-2xl">{String(score).padStart(6, '0')}</span></div>
           <div className="bg-[#1b1513] border border-white/10 rounded-lg p-2 text-center">{ROUND_LABELS[round]}<br /><span className="text-lg md:text-2xl">{mm}:{ss}</span></div>
@@ -210,6 +242,7 @@ export function ToughCrowdGame() {
           className="tc-arena relative overflow-hidden aspect-[16/10] select-none touch-none"
         >
           <img src="/game/club-v2.png" alt="" className="tc-stage" draggable={false} />
+          {impacts.map(effect => <Impact key={effect.id} effect={effect} />)}
           {heckle && <div role="status" className="tc-heckle">{heckle}</div>}
           {tomatoes.map((t) => (
             <div key={t.id} className="tc-tomato" style={{ left: `${t.x}%`, top: `${t.y}%`, scale: 1.3 - 0.5 * Math.min(t.age / t.duration, 1), rotate: `${t.age * 220}deg` }}><TomatoSprite /></div>
@@ -223,7 +256,7 @@ export function ToughCrowdGame() {
             <div className="tc-overlay absolute inset-0 z-40 bg-black/60 flex flex-col items-center justify-center text-center p-6">
               <h2 className="text-3xl md:text-5xl font-black">SURVIVE THE SET</h2>
               <p className="mt-3 text-sm md:text-lg text-white/75 max-w-xl">Move left and right. Dodge tomatoes. Grab popcorn to restore the crowd's patience.</p>
-              <button onClick={() => setStarted(true)} className="mt-6 bg-[#f7c56d] text-black font-black px-7 py-3 rounded-lg text-lg hover:scale-105 transition">START SET</button>
+              <button onClick={() => { void unlock().then(() => play('start')); setStarted(true) }} className="mt-6 bg-[#f7c56d] text-black font-black px-7 py-3 rounded-lg text-lg hover:scale-105 transition">START SET</button>
             </div>
           )}
 
@@ -252,7 +285,7 @@ export function ToughCrowdGame() {
           <span>Mobile: hold left/right side of stage</span>
         </div>
       </div>
-      {(gameOver || won) && <ScoreDialog score={score} won={won} onRestart={resetGame} />}
+      {resultReady && (gameOver || won) && <ScoreDialog score={score} won={won} onRestart={resetGame} />}
     </main>
   )
 }

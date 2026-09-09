@@ -50,3 +50,13 @@
 .tc-restart { padding: 10px; font-size: 12px; text-decoration: underline; color: #d8e3ee; }
 @media (max-width: 440px) { .tc-score-dialog { padding: 20px 14px; }.tc-fields { grid-template-columns: 105px 1fr; gap: 8px; } }
 @media (prefers-reduced-motion: reduce) { .tc-walking .tc-jon-art, .tc-hit .tc-jon-art { animation: none; } }
+.tc-sound-row { display: flex; justify-content: flex-end; margin: 0 0 10px; }
+.tc-sound-row button { color: #f4d6a1; background: #172233; border: 2px solid #506780; padding: 8px 12px; font: bold 11px 'Courier New', monospace; min-height: 40px; }
+.tc-sound-row button:focus-visible { outline: 2px solid #fff0bd; outline-offset: 3px; }
+.tc-impact { position: absolute; z-index: 26; width: 12%; transform: translate(-50%, -50%); pointer-events: none; animation: tc-splash .7s steps(5) forwards; }
+.tc-impact svg { width: 100%; filter: drop-shadow(2px 2px #241524); }
+.tc-impact strong { position: absolute; top: -10%; left: 50%; transform: translateX(-50%) rotate(-9deg); color: #ffe5aa; font: 900 clamp(12px, 2.5cqw, 26px) 'Courier New', monospace; text-shadow: 2px 2px #572637, -1px -1px #572637; white-space: nowrap; }
+.tc-impact-miss { width: 9%; }.tc-impact-miss svg { transform: scaleY(.4); }
+.tc-impact-pickup strong { color: #ffe78d; }
+@keyframes tc-splash { 0% { opacity: 1; scale: .45; } 20% { scale: 1.15; } 45% { scale: 1; opacity: 1; } 100% { opacity: 0; scale: 1; } }
+@media (prefers-reduced-motion: reduce) { .tc-impact { animation: tc-splash-fade .7s linear forwards; } @keyframes tc-splash-fade { from { opacity: 1; } to { opacity: 0; } } }
