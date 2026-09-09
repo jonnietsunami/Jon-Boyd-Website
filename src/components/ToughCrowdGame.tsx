@@ -7,7 +7,7 @@ import { useArcadeAudio } from './tough-crowd/useArcadeAudio'
 import { ScoreDialog } from './tough-crowd/ScoreDialog'
 
 type Tomato = { id: number; x: number; y: number; startX: number; targetX: number; age: number; duration: number }
-type Popcorn = { id: number; x: number; y: number }
+type Popcorn = { id: number; x: number; y: number; age: number }
 
 const ROUND_LENGTH = 45
 const ROUND_LABELS = ['OPENER', 'FEATURE', 'HEADLINER']
@@ -32,10 +32,12 @@ export function ToughCrowdGame() {
   const [won, setWon] = useState(false)
   useEffect(() => {
     if (!gameOver && !won) return
-    const timer = setTimeout(() => { setResultReady(true); play(won ? 'win' : 'lose') }, 700)
+    const timer = setTimeout(() => { setResultReady(true); play(won ? 'win' : 'lose') }, won ? 2200 : 700)
     return () => clearTimeout(timer)
   }, [gameOver, won, play])
   const [round, setRound] = useState(0)
+  const [roundBreak, setRoundBreak] = useState(false)
+  const immuneUntil = useRef(0)
   const [timeLeft, setTimeLeft] = useState(ROUND_LENGTH)
   const [score, setScore] = useState(0)
   const [lives, setLives] = useState(3)
@@ -67,6 +69,8 @@ export function ToughCrowdGame() {
     setGameOver(false)
     setWon(false)
     setRound(0)
+    setRoundBreak(false)
+    immuneUntil.current = 0
     setTimeLeft(ROUND_LENGTH)
     setScore(0)
     setLives(3)
@@ -104,31 +108,52 @@ export function ToughCrowdGame() {
   }, [])
 
   useEffect(() => {
-    if (!started || gameOver || won) return
-    const timer = window.setInterval(() => {
-      setTimeLeft((t) => {
-        if (t > 1) return t - 1
-        if (round < 2) {
-          setRound((r) => r + 1)
-          return ROUND_LENGTH
-        }
-        setWon(true)
-        return 0
-      })
-      setScore((s) => s + 10)
+    if (!started || gameOver || won || roundBreak) return
+    if (timeLeft === 0) {
+      setTomatoes([])
+      setPopcorn([])
+      setHeckle('')
+      setMoving(false)
+      keys.current = { left: false, right: false }
+      play('cheer')
+      if (round === 2) setWon(true)
+      else setRoundBreak(true)
+      return
+    }
+    const timer = setTimeout(() => {
+      setTimeLeft(t => t - 1)
+      setScore(s => s + 10)
     }, 1000)
-    return () => window.clearInterval(timer)
-  }, [started, gameOver, won, round])
+    return () => clearTimeout(timer)
+  }, [started, gameOver, won, roundBreak, timeLeft, round, play])
 
   useEffect(() => {
-    if (!started || gameOver || won) return
+    if (!roundBreak) return
+    const timer = setTimeout(() => {
+      setRound(r => r + 1)
+      setTimeLeft(ROUND_LENGTH)
+      setRoundBreak(false)
+    }, 2200)
+    return () => clearTimeout(timer)
+  }, [roundBreak])
+
+  useEffect(() => {
+    if (!started || gameOver || won || roundBreak || timeLeft === 0) return
     let raf = 0
     let last = performance.now()
     let spawnClock = 0
+    let popcornClock = 3
     const frame = (now: number) => {
       const dt = Math.min((now - last) / 1000, 0.05)
       last = now
       spawnClock += dt
+      popcornClock += dt
+      if (popcornClock >= 8) {
+        popcornClock = 0
+        const item = { id: popcornId.current++, x: 12 + Math.random() * 76, y: 49, age: 0 }
+        setPopcorn(items => [...items.slice(-1), item])
+      }
+      setPopcorn(items => items.map(item => ({ ...item, age: item.age + dt })).filter(item => item.age < 8))
 
       setMoving(keys.current.left !== keys.current.right)
       setPlayerX((x) => {
@@ -150,7 +175,7 @@ export function ToughCrowdGame() {
             id: tomatoId.current++,
             x: startX,
             y: 82,
-            startX, targetX, age: 0, duration: [1.35, 1.15, 0.95][round],
+            startX, targetX, age: -0.55, duration: [1.35, 1.15, 0.95][round],
           },
         ])
       }
@@ -170,18 +195,19 @@ export function ToughCrowdGame() {
     }
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
-  }, [started, gameOver, won, round])
+  }, [started, gameOver, won, round, roundBreak, timeLeft === 0])
 
   useEffect(() => {
-    if (!started || gameOver || won) return
+    if (!started || gameOver || won || roundBreak || timeLeft === 0) return
     for (const t of tomatoes) {
       if (t.age < t.duration || resolvedTomatoes.current.has(t.id)) continue
       resolvedTomatoes.current.add(t.id)
-      const landedHit = throwHits(t.x, playerX, t.age, t.duration)
+      const landedHit = performance.now() >= immuneUntil.current && throwHits(t.x, playerX, t.age, t.duration)
       setImpacts(items => [...items, { id: impactId.current++, x: t.x, y: landedHit ? 39 : 52, kind: landedHit ? 'hit' : 'miss', created: Date.now() }])
       play(landedHit ? 'splat' : 'miss')
       setTomatoes(items => items.filter(item => item.id !== t.id))
-      if (throwHits(t.x, playerX, t.age, t.duration)) {
+      if (landedHit) {
+        immuneUntil.current = performance.now() + 1000
         setTomatoes((ts) => ts.filter((x) => x.id !== t.id))
         setLives((l) => {
           const next = l - 1
@@ -191,17 +217,14 @@ export function ToughCrowdGame() {
         setHeckle(heckles[round][Math.floor(Math.random() * heckles[round].length)])
         setHit(true)
         clearTimeout(hitTimer.current)
-        hitTimer.current = setTimeout(() => { setHeckle(''); setHit(false) }, 1100)
-        if (lives > 1 && Math.random() < 0.45) {
-          setPopcorn((p) => [...p, { id: popcornId.current++, x: 12 + Math.random() * 76, y: 49 }])
-        }
+        hitTimer.current = setTimeout(() => { setHeckle(''); setHit(false) }, 1000)
         break
       }
     }
-  }, [tomatoes, playerX, started, gameOver, won, round, heckles, lives, play])
+  }, [tomatoes, playerX, started, gameOver, won, round, heckles, lives, play, roundBreak, timeLeft])
 
   useEffect(() => {
-    if (!started || gameOver || won) return
+    if (!started || gameOver || won || roundBreak || timeLeft === 0) return
     for (const p of popcorn) {
       if (resolvedPopcorn.current.has(p.id)) continue
       if (Math.abs(p.x - playerX) < 5 && Math.abs(p.y - 49) < 8) {
@@ -214,7 +237,7 @@ export function ToughCrowdGame() {
         break
       }
     }
-  }, [popcorn, playerX, started, gameOver, won, play])
+  }, [popcorn, playerX, started, gameOver, won, play, roundBreak, timeLeft])
 
   const simulated = round === 0 ? 5 : round === 1 ? 10 : 20
   const elapsed = ROUND_LENGTH - timeLeft
@@ -244,18 +267,25 @@ export function ToughCrowdGame() {
           <img src="/game/club-v2.png" alt="" className="tc-stage" draggable={false} />
           {impacts.map(effect => <Impact key={effect.id} effect={effect} />)}
           {heckle && <div role="status" className="tc-heckle">{heckle}</div>}
-          {tomatoes.map((t) => (
+          {tomatoes.filter(t => t.age < 0).map(t => <div key={`warning-${t.id}`} aria-hidden="true" className="tc-throw-warning" style={{ left: `${t.startX}%` }}><span>!</span><i /></div>)}
+          {tomatoes.filter(t => t.age >= 0).map((t) => (
             <div key={t.id} className="tc-tomato" style={{ left: `${t.x}%`, top: `${t.y}%`, scale: 1.3 - 0.5 * Math.min(t.age / t.duration, 1), rotate: `${t.age * 220}deg` }}><TomatoSprite /></div>
           ))}
           {popcorn.map((p) => (
             <div key={p.id} className="tc-popcorn" style={{ left: `${p.x}%`, top: `${p.y}%` }}><PopcornSprite /></div>
           ))}
-          <div className={`tc-player ${moving && started && !gameOver && !won ? "tc-walking" : ""} ${hit ? "tc-hit" : ""}`} style={{ left: `${playerX}%` }}><img src="/game/jon-v2.png" alt="Jon Boyd" className="tc-jon-art" draggable={false} /></div>
+          <div className={`tc-player ${moving && started && !gameOver && !won && !roundBreak ? "tc-walking" : ""} ${hit ? "tc-hit" : ""}`} style={{ left: `${playerX}%` }}><img src={hit ? "/game/jon-ouch.png" : "/game/jon-v2.png"} alt={hit ? "Jon Boyd wincing" : "Jon Boyd"} className="tc-jon-art" draggable={false} /></div>
 
+          {(roundBreak || (won && !resultReady)) && <div className="tc-round-clear" role="status">
+            <p>THE CROWD GOES WILD!</p><h2>{ROUND_LABELS[round]} CLEARED</h2>
+            <span>{won ? 'YOU KILLED. TAKE A BOW.' : `UP NEXT: ${ROUND_LABELS[round + 1]}`}</span>
+            <div className="tc-cheer-bubbles" aria-hidden="true"><b>WOO!</b><b>YEAH!</b><b>ENCORE!</b></div>
+          </div>}
+          <img src="/game/jon-ouch.png" alt="" className="tc-preload" aria-hidden="true" />
           {!started && !gameOver && !won && (
             <div className="tc-overlay absolute inset-0 z-40 bg-black/60 flex flex-col items-center justify-center text-center p-6">
               <h2 className="text-3xl md:text-5xl font-black">SURVIVE THE SET</h2>
-              <p className="mt-3 text-sm md:text-lg text-white/75 max-w-xl">Move left and right. Dodge tomatoes. Grab popcorn to restore the crowd's patience.</p>
+              <p className="mt-3 text-sm md:text-lg text-white/75 max-w-xl">Watch for ! in the crowd, then dodge the throw. Grab popcorn for patience and bonus points.</p>
               <button onClick={() => { void unlock().then(() => play('start')); setStarted(true) }} className="mt-6 bg-[#f7c56d] text-black font-black px-7 py-3 rounded-lg text-lg hover:scale-105 transition">START SET</button>
             </div>
           )}
