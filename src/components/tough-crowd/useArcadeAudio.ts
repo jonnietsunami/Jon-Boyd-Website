@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-type Cue = 'start' | 'splat' | 'miss' | 'pickup' | 'win' | 'lose' | 'cheer'
+type Cue = 'start' | 'splat' | 'miss' | 'pickup' | 'win' | 'lose' | 'cheer' | 'goodnight'
 export function useArcadeAudio() {
   const context = useRef<AudioContext | null>(null)
+  const voice = useRef<AudioBuffer | null>(null)
+  const voiceLoading = useRef<Promise<void> | null>(null)
   const master = useRef<GainNode | null>(null)
   const [muted, setMuted] = useState(false)
   const silent = useRef(false)
   useEffect(() => {
     try { silent.current = localStorage.getItem('tc-muted') === 'true'; setMuted(silent.current) } catch { /* Storage is optional. */ }
-    return () => { void context.current?.close().catch(() => {}); context.current = null; master.current = null }
+    return () => { void context.current?.close().catch(() => {}); context.current = null; master.current = null; voice.current = null; voiceLoading.current = null }
   }, [])
   // Called only from a user gesture; browser autoplay restrictions remain respected.
   const unlock = useCallback(async () => {
@@ -19,7 +21,15 @@ export function useArcadeAudio() {
         master.current.gain.value = silent.current ? 0 : .22
         master.current.connect(context.current.destination)
       }
-      await context.current.resume().catch(() => {})
+      const ctx = context.current
+      if (!voiceLoading.current) {
+        voiceLoading.current = fetch('/game/thank-you-good-night.m4a')
+          .then(response => { if (!response.ok) throw new Error('Voice unavailable'); return response.arrayBuffer() })
+          .then(data => ctx.decodeAudioData(data))
+          .then(buffer => { if (context.current === ctx) voice.current = buffer })
+          .catch(() => { voiceLoading.current = null })
+      }
+      await ctx.resume().catch(() => {})
     } catch { /* Gameplay still works when audio is unavailable. */ }
   }, [])
   const toggle = useCallback(() => {
@@ -45,7 +55,15 @@ export function useArcadeAudio() {
       oscillator.onended = () => { oscillator.disconnect(); gain.disconnect() }
       oscillator.start(now + delay); oscillator.stop(now + delay + duration + .02)
     }
-    if (cue === 'cheer') {
+    if (cue === 'goodnight') {
+      if (!voice.current) return
+      const source = ctx.createBufferSource(), gain = ctx.createGain()
+      source.buffer = voice.current
+      gain.gain.value = 3
+      source.connect(gain); gain.connect(output)
+      source.onended = () => { source.disconnect(); gain.disconnect() }
+      source.start()
+    } else if (cue === 'cheer') {
       // Short arcade crowd: staggered claps underneath overlapping rising whoops.
       const duration = 1.9
       const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * duration), ctx.sampleRate)

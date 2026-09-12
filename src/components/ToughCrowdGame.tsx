@@ -32,8 +32,10 @@ export function ToughCrowdGame() {
   const [won, setWon] = useState(false)
   useEffect(() => {
     if (!gameOver && !won) return
-    const timer = setTimeout(() => { setResultReady(true); play(won ? 'win' : 'lose') }, won ? 2200 : 700)
-    return () => clearTimeout(timer)
+    if (won) play('goodnight')
+    const cheerTimer = won ? setTimeout(() => play('cheer'), 5700) : undefined
+    const timer = setTimeout(() => { setResultReady(true); if (!won) play('lose') }, won ? 7900 : 700)
+    return () => { clearTimeout(timer); clearTimeout(cheerTimer) }
   }, [gameOver, won, play])
   const [round, setRound] = useState(0)
   const [roundBreak, setRoundBreak] = useState(false)
@@ -115,9 +117,8 @@ export function ToughCrowdGame() {
       setHeckle('')
       setMoving(false)
       keys.current = { left: false, right: false }
-      play('cheer')
       if (round === 2) setWon(true)
-      else setRoundBreak(true)
+      else { play('cheer'); setRoundBreak(true) }
       return
     }
     const timer = setTimeout(() => {
@@ -274,13 +275,14 @@ export function ToughCrowdGame() {
           {popcorn.map((p) => (
             <div key={p.id} className="tc-popcorn" style={{ left: `${p.x}%`, top: `${p.y}%` }}><PopcornSprite /></div>
           ))}
-          <div className={`tc-player ${moving && started && !gameOver && !won && !roundBreak ? "tc-walking" : ""} ${hit ? "tc-hit" : ""}`} style={{ left: `${playerX}%` }}><img src={hit ? "/game/jon-ouch.png" : "/game/jon-v2.png"} alt={hit ? "Jon Boyd wincing" : "Jon Boyd"} className="tc-jon-art" draggable={false} /></div>
+          <div className={`tc-player ${moving && started && !gameOver && !won && !roundBreak ? "tc-walking" : ""} ${hit && !won ? "tc-hit" : ""} ${won ? "tc-victory" : ""}`} style={{ left: `${playerX}%` }}><img src={won ? "/game/jon-victory.png" : hit ? "/game/jon-ouch.png" : "/game/jon-v2.png"} alt={won ? "Jon Boyd raising his microphone" : hit ? "Jon Boyd wincing" : "Jon Boyd"} className="tc-jon-art" draggable={false} /></div>
 
           {(roundBreak || (won && !resultReady)) && <div className="tc-round-clear" role="status">
             <p>THE CROWD GOES WILD!</p><h2>{ROUND_LABELS[round]} CLEARED</h2>
-            <span>{won ? 'YOU KILLED. TAKE A BOW.' : `UP NEXT: ${ROUND_LABELS[round + 1]}`}</span>
+            <span>{won ? 'THANK YOU, GOOD NIGHT!' : `UP NEXT: ${ROUND_LABELS[round + 1]}`}</span>
             <div className="tc-cheer-bubbles" aria-hidden="true"><b>WOO!</b><b>YEAH!</b><b>ENCORE!</b></div>
           </div>}
+          <img src="/game/jon-victory.png" alt="" className="tc-preload" aria-hidden="true" />
           <img src="/game/jon-ouch.png" alt="" className="tc-preload" aria-hidden="true" />
           {!started && !gameOver && !won && (
             <div className="tc-overlay absolute inset-0 z-40 bg-black/60 flex flex-col items-center justify-center text-center p-6">

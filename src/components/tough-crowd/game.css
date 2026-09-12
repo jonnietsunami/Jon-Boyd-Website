@@ -72,3 +72,4 @@
 .tc-cheer-bubbles b:nth-child(2) { animation-delay: .15s; }.tc-cheer-bubbles b:nth-child(3) { animation-delay: .3s; }
 @keyframes tc-cheer { to { transform: translateY(-6px) rotate(3deg); } }
 @media (prefers-reduced-motion: reduce) { .tc-cheer-bubbles b { animation: none; } }
+.tc-player.tc-victory { height: 37%; width: 17%; }

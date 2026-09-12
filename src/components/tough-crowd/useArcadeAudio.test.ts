@@ -27,3 +27,22 @@ test('unsupported audio does not prevent starting the game', async () => {
   expect(() => hook.result.current.play('splat')).not.toThrow()
   hook.unmount()
 })
+test('preloads the real voice clip and routes finale playback through the mute-controlled output', async () => {
+  const param = () => ({value:0,setValueAtTime:vi.fn(),exponentialRampToValueAtTime:vi.fn()})
+  const clip = {duration:5.652}
+  const source = {buffer:null,connect:vi.fn(),disconnect:vi.fn(),start:vi.fn()}
+  const decode = vi.fn(async()=>clip)
+  const fetchClip = vi.fn(async()=>({ok:true,arrayBuffer:async()=>new ArrayBuffer(4)}))
+  vi.stubGlobal('fetch',fetchClip)
+  vi.stubGlobal('AudioContext',vi.fn(function(){return {state:'running',currentTime:0,destination:{},resume:async()=>{},close:async()=>{},createGain:()=>({gain:param(),connect:vi.fn(),disconnect:vi.fn()}),decodeAudioData:decode,createBufferSource:()=>source}}))
+  const hook=renderHook(()=>useArcadeAudio())
+  await act(async()=>{await hook.result.current.unlock()})
+  expect(fetchClip).toHaveBeenCalledWith('/game/thank-you-good-night.m4a')
+  act(()=>hook.result.current.play('goodnight'))
+  expect(source.buffer).toBe(clip)
+  expect(source.start).toHaveBeenCalledOnce()
+  act(()=>hook.result.current.toggle())
+  act(()=>hook.result.current.play('goodnight'))
+  expect(source.start).toHaveBeenCalledOnce()
+  hook.unmount()
+})
