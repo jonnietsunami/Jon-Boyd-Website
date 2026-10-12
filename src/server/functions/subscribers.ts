@@ -2,6 +2,11 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { eq, desc } from 'drizzle-orm'
 import { db, emailSubscribers } from '../db'
+import { getCurrentAdmin } from '../auth'
+
+async function requireAdmin() {
+  if (!await getCurrentAdmin()) throw new Error('Unauthorized')
+}
 
 // Map to snake_case for frontend compatibility
 function mapSubscriber(sub: typeof emailSubscribers.$inferSelect) {
@@ -47,6 +52,7 @@ export const subscribeEmail = createServerFn({ method: 'POST' })
 // Get all subscribers (admin)
 export const getSubscribers = createServerFn({ method: 'GET' }).handler(
   async () => {
+    await requireAdmin()
     const subscribers = await db
       .select()
       .from(emailSubscribers)
@@ -59,6 +65,7 @@ export const getSubscribers = createServerFn({ method: 'GET' }).handler(
 // Export subscribers as CSV (admin)
 export const exportSubscribersCSV = createServerFn({ method: 'GET' }).handler(
   async () => {
+    await requireAdmin()
     const subscribers = await db
       .select({
         email: emailSubscribers.email,
@@ -85,6 +92,7 @@ export const exportSubscribersCSV = createServerFn({ method: 'GET' }).handler(
 export const deleteSubscriber = createServerFn({ method: 'POST' })
   .inputValidator(z.object({ id: z.string().uuid() }))
   .handler(async ({ data }) => {
+    await requireAdmin()
     await db.delete(emailSubscribers).where(eq(emailSubscribers.id, data.id))
     return { success: true }
   })
