@@ -73,3 +73,10 @@
 @keyframes tc-cheer { to { transform: translateY(-6px) rotate(3deg); } }
 @media (prefers-reduced-motion: reduce) { .tc-cheer-bubbles b { animation: none; } }
 .tc-player.tc-victory { height: 37%; width: 17%; }
+
+.tc-sound-row { gap: 8px; }
+.tc-touch-controls { display: flex; gap: 16px; margin-top: 20px; }
+.tc-touch-controls button { flex: 1; min-height: 60px; padding: 14px 8px; background: #172a40; color: #ffe1a1; border: 3px solid #587b99; box-shadow: 0 4px #080e19; font: bold 14px 'Courier New', monospace; touch-action: none; user-select: none; -webkit-touch-callout: none; }
+.tc-touch-controls button:active:not(:disabled) { background: #365776; transform: translateY(2px); }
+.tc-touch-controls button:disabled { opacity: .45; }
+.tc-touch-controls button:focus-visible { outline: 3px solid #ffe1a1; outline-offset: 3px; }

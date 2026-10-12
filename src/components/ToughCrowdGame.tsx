@@ -27,6 +27,10 @@ export function ToughCrowdGame() {
   const keys = useRef({ left: false, right: false })
   const tomatoId = useRef(0)
   const popcornId = useRef(0)
+  const [paused, setPaused] = useState(false)
+  const pausedRef = useRef(false)
+  const pause = () => { pausedRef.current = true; setPaused(true); keys.current = { left: false, right: false }; setMoving(false) }
+  const resume = () => { pausedRef.current = false; setPaused(false); void unlock() }
   const [started, setStarted] = useState(false)
   const [gameOver, setGameOver] = useState(false)
   const [won, setWon] = useState(false)
@@ -63,6 +67,8 @@ export function ToughCrowdGame() {
   )
 
   const resetGame = () => {
+    pausedRef.current = false
+    setPaused(false)
     setImpacts([])
     setResultReady(false)
     resolvedTomatoes.current.clear()
@@ -89,7 +95,7 @@ export function ToughCrowdGame() {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.matches('input, textarea')) return
+      if (pausedRef.current || (e.target instanceof HTMLElement && e.target.matches('input, textarea'))) return
       if (['ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault()
       if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') keys.current.left = true
       if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') keys.current.right = true
@@ -98,19 +104,25 @@ export function ToughCrowdGame() {
       if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') keys.current.left = false
       if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') keys.current.right = false
     }
-    const blur = () => { keys.current = { left: false, right: false } }
+    const blur = () => {
+      keys.current = { left: false, right: false }
+      if (started && !gameOver && !won) pause()
+    }
+    const visibility = () => { if (document.hidden) blur() }
+    document.addEventListener('visibilitychange', visibility)
     window.addEventListener('blur', blur)
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     return () => {
+      document.removeEventListener('visibilitychange', visibility)
       window.removeEventListener('blur', blur)
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
-  }, [])
+  }, [started, gameOver, won])
 
   useEffect(() => {
-    if (!started || gameOver || won || roundBreak) return
+    if (!started || gameOver || won || roundBreak || paused) return
     if (timeLeft === 0) {
       setTomatoes([])
       setPopcorn([])
@@ -122,21 +134,22 @@ export function ToughCrowdGame() {
       return
     }
     const timer = setTimeout(() => {
+      if (pausedRef.current) return
       setTimeLeft(t => t - 1)
       setScore(s => s + 10)
     }, 1000)
     return () => clearTimeout(timer)
-  }, [started, gameOver, won, roundBreak, timeLeft, round, play])
+  }, [started, gameOver, won, roundBreak, timeLeft, round, play, paused])
 
   useEffect(() => {
-    if (!roundBreak) return
+    if (!roundBreak || paused) return
     const timer = setTimeout(() => {
       setRound(r => r + 1)
       setTimeLeft(ROUND_LENGTH)
       setRoundBreak(false)
     }, 2200)
     return () => clearTimeout(timer)
-  }, [roundBreak])
+  }, [roundBreak, paused])
 
   useEffect(() => {
     if (!started || gameOver || won || roundBreak || timeLeft === 0) return
@@ -147,6 +160,7 @@ export function ToughCrowdGame() {
     const frame = (now: number) => {
       const dt = Math.min((now - last) / 1000, 0.05)
       last = now
+      if (pausedRef.current) { raf = requestAnimationFrame(frame); return }
       spawnClock += dt
       popcornClock += dt
       if (popcornClock >= 8) {
@@ -199,7 +213,7 @@ export function ToughCrowdGame() {
   }, [started, gameOver, won, round, roundBreak, timeLeft === 0])
 
   useEffect(() => {
-    if (!started || gameOver || won || roundBreak || timeLeft === 0) return
+    if (!started || gameOver || won || roundBreak || pausedRef.current || timeLeft === 0) return
     for (const t of tomatoes) {
       if (t.age < t.duration || resolvedTomatoes.current.has(t.id)) continue
       resolvedTomatoes.current.add(t.id)
@@ -225,7 +239,7 @@ export function ToughCrowdGame() {
   }, [tomatoes, playerX, started, gameOver, won, round, heckles, lives, play, roundBreak, timeLeft])
 
   useEffect(() => {
-    if (!started || gameOver || won || roundBreak || timeLeft === 0) return
+    if (!started || gameOver || won || roundBreak || pausedRef.current || timeLeft === 0) return
     for (const p of popcorn) {
       if (resolvedPopcorn.current.has(p.id)) continue
       if (Math.abs(p.x - playerX) < 5 && Math.abs(p.y - 49) < 8) {
@@ -254,7 +268,7 @@ export function ToughCrowdGame() {
           <p className="text-xs md:text-sm tracking-[0.35em] text-white/60 mt-1">A JON BOYD GAME</p>
         </div>
 
-        <div className="tc-sound-row"><button type="button" onClick={toggle} aria-pressed={!muted} aria-label={muted ? 'Turn sound on' : 'Mute sound'}>{muted ? 'SOUND: OFF' : 'SOUND: ON'}</button></div>
+        <div className="tc-sound-row">{started && !gameOver && !won && <button type="button" onClick={paused ? resume : pause}>{paused ? 'RESUME SET' : 'PAUSE'}</button>}<button type="button" onClick={toggle} aria-pressed={!muted} aria-label={muted ? 'Turn sound on' : 'Mute sound'}>{muted ? 'SOUND: OFF' : 'SOUND: ON'}</button></div>
         <div className="tc-hud grid grid-cols-3 gap-2 mb-2 text-[11px] md:text-sm font-bold tracking-wider">
           <div className="bg-[#1b1513] border border-white/10 rounded-lg p-2">SCORE<br /><span className="text-lg md:text-2xl">{String(score).padStart(6, '0')}</span></div>
           <div className="bg-[#1b1513] border border-white/10 rounded-lg p-2 text-center">{ROUND_LABELS[round]}<br /><span className="text-lg md:text-2xl">{mm}:{ss}</span></div>
@@ -275,7 +289,7 @@ export function ToughCrowdGame() {
           {popcorn.map((p) => (
             <div key={p.id} className="tc-popcorn" style={{ left: `${p.x}%`, top: `${p.y}%` }}><PopcornSprite /></div>
           ))}
-          <div className={`tc-player ${moving && started && !gameOver && !won && !roundBreak ? "tc-walking" : ""} ${hit && !won ? "tc-hit" : ""} ${won ? "tc-victory" : ""}`} style={{ left: `${playerX}%` }}><img src={won ? "/game/jon-victory.png" : hit ? "/game/jon-ouch.png" : "/game/jon-v2.png"} alt={won ? "Jon Boyd raising his microphone" : hit ? "Jon Boyd wincing" : "Jon Boyd"} className="tc-jon-art" draggable={false} /></div>
+          <div className={`tc-player ${moving && !paused && started && !gameOver && !won && !roundBreak ? "tc-walking" : ""} ${hit && !won ? "tc-hit" : ""} ${won ? "tc-victory" : ""}`} style={{ left: `${playerX}%` }}><img src={won ? "/game/jon-victory.png" : hit ? "/game/jon-ouch.png" : "/game/jon-v2.png"} alt={won ? "Jon Boyd raising his microphone" : hit ? "Jon Boyd wincing" : "Jon Boyd"} className="tc-jon-art" draggable={false} /></div>
 
           {(roundBreak || (won && !resultReady)) && <div className="tc-round-clear" role="status">
             <p>THE CROWD GOES WILD!</p><h2>{ROUND_LABELS[round]} CLEARED</h2>
@@ -292,29 +306,28 @@ export function ToughCrowdGame() {
             </div>
           )}
 
-          <button
-            type="button"
-            aria-label="Move left"
-            onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); keys.current.left = true }}
-            onPointerCancel={() => (keys.current.left = false)}
-            onPointerUp={() => (keys.current.left = false)}
-            onPointerLeave={() => (keys.current.left = false)}
-            className="absolute z-30 left-0 bottom-0 w-1/2 h-full opacity-0 md:hidden"
-          />
-          <button
-            type="button"
-            aria-label="Move right"
-            onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); keys.current.right = true }}
-            onPointerCancel={() => (keys.current.right = false)}
-            onPointerUp={() => (keys.current.right = false)}
-            onPointerLeave={() => (keys.current.right = false)}
-            className="absolute z-30 right-0 bottom-0 w-1/2 h-full opacity-0 md:hidden"
-          />
+          {paused && <div className="tc-overlay absolute inset-0 z-40 flex flex-col items-center justify-center text-center p-6" role="dialog" aria-label="Game paused">
+            <h2>SET PAUSED</h2><p>Your crowd can wait. Ready when you are.</p>
+            <button autoFocus onClick={resume} className="mt-4 bg-[#f7c56d] text-black font-black px-7 py-3">RESUME SET</button>
+          </div>}
+
         </div>
 
+        <div className="tc-touch-controls" aria-label="Movement controls">
+          {(['left', 'right'] as const).map(direction => <button key={direction} type="button" aria-label={`Move ${direction}`} disabled={!started || gameOver || won || paused || roundBreak}
+            onPointerDown={e => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); keys.current[direction] = true }}
+            onPointerUp={() => { keys.current[direction] = false }}
+            onPointerCancel={() => { keys.current[direction] = false }}
+            onLostPointerCapture={() => { keys.current[direction] = false }}
+            onContextMenu={e => e.preventDefault()}
+            onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); keys.current[direction] = true } }}
+            onKeyUp={() => { keys.current[direction] = false }}
+            onBlur={() => { keys.current[direction] = false }}
+          >{direction === 'left' ? '◀ MOVE LEFT' : 'MOVE RIGHT ▶'}</button>)}
+        </div>
         <div className="flex justify-between items-center mt-3 text-xs md:text-sm text-white/50">
           <span>Desktop: ← → or A / D</span>
-          <span>Mobile: hold left/right side of stage</span>
+          <span>Touch: hold the arrow buttons</span>
         </div>
       </div>
       {resultReady && (gameOver || won) && <ScoreDialog score={score} won={won} onRestart={resetGame} />}
