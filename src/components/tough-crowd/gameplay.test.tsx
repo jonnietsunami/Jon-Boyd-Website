@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import * as trajectory from './trajectory'
 import { ToughCrowdGame } from '../ToughCrowdGame'
-const audio = vi.hoisted(() => ({play:vi.fn(), unlock:vi.fn(async()=>{}), toggle:vi.fn(), muted:false}))
+const audio = vi.hoisted(() => ({play:vi.fn(), unlock:vi.fn(async()=>{}), toggle:vi.fn(), muted:false, musicMuted:false, toggleMusic:vi.fn(), setScene:vi.fn()}))
 vi.mock('./useArcadeAudio', () => ({useArcadeAudio:()=>audio}))
 vi.mock('./ScoreDialog', () => ({ScoreDialog:()=> <div>Score entry</div>}))
 beforeEach(() => { vi.useFakeTimers(); vi.spyOn(Math,'random').mockReturnValue(0) })

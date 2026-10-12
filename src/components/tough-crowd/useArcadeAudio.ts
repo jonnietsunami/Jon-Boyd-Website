@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { musicSamples, crowdSamples, retroSamples } from './soundtrack'
+
 type Cue = 'start' | 'splat' | 'miss' | 'pickup' | 'win' | 'lose' | 'cheer' | 'goodnight'
 export function useArcadeAudio() {
   const context = useRef<AudioContext | null>(null)
@@ -8,6 +10,39 @@ export function useArcadeAudio() {
   const master = useRef<GainNode | null>(null)
   const [muted, setMuted] = useState(false)
   const silent = useRef(false)
+  const [musicMuted, setMusicMuted] = useState(false)
+  const [ready, setReady] = useState(0)
+  const [background, setBackground] = useState({ active: false, round: 0 })
+  const setScene = useCallback((active: boolean, round: number) => setBackground(old => old.active === active && old.round === round ? old : { active, round }), [])
+  useEffect(() => {
+    try { setMusicMuted(localStorage.getItem('tc-music-muted') === 'true') } catch { /* Optional storage. */ }
+  }, [])
+  useEffect(() => {
+    const ctx = context.current
+    if (!ctx || !background.active || ctx.state !== 'running') return
+    const nodes: { source: AudioBufferSourceNode; gain: GainNode }[] = []
+    const loop = (samples: Float32Array, volume: number) => {
+      const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate)
+      buffer.getChannelData(0).set(samples)
+      const source = ctx.createBufferSource(), gain = ctx.createGain()
+      source.buffer = buffer; source.loop = true
+      gain.gain.setValueAtTime(0, ctx.currentTime)
+      gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + .2)
+      source.connect(gain); gain.connect(ctx.destination); source.start()
+      nodes.push({ source, gain })
+    }
+    if (!musicMuted) loop(musicSamples(ctx.sampleRate, background.round), .32)
+    if (!muted) loop(crowdSamples(ctx.sampleRate), .4)
+    return () => {
+      for (const { source, gain } of nodes) {
+        gain.gain.cancelScheduledValues(ctx.currentTime)
+        gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime)
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + .08)
+        source.onended = () => { source.disconnect(); gain.disconnect() }
+        source.stop(ctx.currentTime + .09)
+      }
+    }
+  }, [background, musicMuted, muted, ready])
   useEffect(() => {
     try { silent.current = localStorage.getItem('tc-muted') === 'true'; setMuted(silent.current) } catch { /* Storage is optional. */ }
     return () => { void context.current?.close().catch(() => {}); context.current = null; master.current = null; voice.current = null; voiceLoading.current = null }
@@ -26,10 +61,17 @@ export function useArcadeAudio() {
         voiceLoading.current = fetch('/game/thank-you-good-night.m4a')
           .then(response => { if (!response.ok) throw new Error('Voice unavailable'); return response.arrayBuffer() })
           .then(data => ctx.decodeAudioData(data))
-          .then(buffer => { if (context.current === ctx) voice.current = buffer })
+          .then(buffer => {
+            for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+              const samples = buffer.getChannelData(channel)
+              samples.set(retroSamples(samples, buffer.sampleRate))
+            }
+            if (context.current === ctx) voice.current = buffer
+          })
           .catch(() => { voiceLoading.current = null })
       }
-      await ctx.resume().catch(() => {})
+      await ctx.resume()
+      if (ctx.state === 'running') setReady(value => value + 1)
     } catch { /* Gameplay still works when audio is unavailable. */ }
   }, [])
   const toggle = useCallback(() => {
@@ -109,5 +151,12 @@ export function useArcadeAudio() {
       notes.forEach((note, index) => tone(note, index * .1, .16))
     }
   }, [])
-  return { muted, toggle, unlock, play }
+  const toggleMusic = useCallback(() => {
+    void unlock()
+    setMusicMuted(value => {
+      try { localStorage.setItem('tc-music-muted', String(!value)) } catch { /* Optional storage. */ }
+      return !value
+    })
+  }, [unlock])
+  return { muted, toggle, musicMuted, toggleMusic, setScene, unlock, play }
 }

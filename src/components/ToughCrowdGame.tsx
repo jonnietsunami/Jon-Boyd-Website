@@ -13,7 +13,7 @@ const ROUND_LENGTH = 45
 const ROUND_LABELS = ['OPENER', 'FEATURE', 'HEADLINER']
 
 export function ToughCrowdGame() {
-  const { muted, toggle, unlock, play } = useArcadeAudio()
+  const { muted, toggle, musicMuted, toggleMusic, setScene, unlock, play } = useArcadeAudio()
   const [impacts, setImpacts] = useState<ImpactEvent[]>([])
   const [resultReady, setResultReady] = useState(false)
   const impactId = useRef(0)
@@ -43,6 +43,9 @@ export function ToughCrowdGame() {
   }, [gameOver, won, play])
   const [round, setRound] = useState(0)
   const [roundBreak, setRoundBreak] = useState(false)
+  useEffect(() => {
+    setScene(started && !paused && !gameOver && !won && !roundBreak, round)
+  }, [started, paused, gameOver, won, roundBreak, round, setScene])
   const immuneUntil = useRef(0)
   const [timeLeft, setTimeLeft] = useState(ROUND_LENGTH)
   const [score, setScore] = useState(0)
@@ -268,7 +271,7 @@ export function ToughCrowdGame() {
           <p className="text-xs md:text-sm tracking-[0.35em] text-white/60 mt-1">A JON BOYD GAME</p>
         </div>
 
-        <div className="tc-sound-row">{started && !gameOver && !won && <button type="button" onClick={paused ? resume : pause}>{paused ? 'RESUME SET' : 'PAUSE'}</button>}<button type="button" onClick={toggle} aria-pressed={!muted} aria-label={muted ? 'Turn sound on' : 'Mute sound'}>{muted ? 'SOUND: OFF' : 'SOUND: ON'}</button></div>
+        <div className="tc-sound-row">{started && !gameOver && !won && <button type="button" onClick={paused ? resume : pause}>{paused ? 'RESUME SET' : 'PAUSE'}</button>}<button type="button" onClick={toggle} aria-pressed={!muted} aria-label={muted ? 'Turn sound on' : 'Mute sound'}>{muted ? 'SFX: OFF' : 'SFX: ON'}</button><button type="button" onClick={toggleMusic} aria-pressed={!musicMuted} aria-label={musicMuted ? 'Turn music on' : 'Mute music'}>{musicMuted ? 'MUSIC: OFF' : 'MUSIC: ON'}</button></div>
         <div className="tc-hud grid grid-cols-3 gap-2 mb-2 text-[11px] md:text-sm font-bold tracking-wider">
           <div className="bg-[#1b1513] border border-white/10 rounded-lg p-2">SCORE<br /><span className="text-lg md:text-2xl">{String(score).padStart(6, '0')}</span></div>
           <div className="bg-[#1b1513] border border-white/10 rounded-lg p-2 text-center">{ROUND_LABELS[round]}<br /><span className="text-lg md:text-2xl">{mm}:{ss}</span></div>

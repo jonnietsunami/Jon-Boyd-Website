@@ -46,3 +46,27 @@ test('preloads the real voice clip and routes finale playback through the mute-c
   expect(source.start).toHaveBeenCalledOnce()
   hook.unmount()
 })
+test('background is gesture gated, independently muted, and stops on pause', async () => {
+  const sources: any[] = []
+  const param = () => ({value:0,setValueAtTime:vi.fn(),linearRampToValueAtTime:vi.fn(),cancelScheduledValues:vi.fn()})
+  vi.stubGlobal('fetch', vi.fn(async()=>({ok:false})))
+  vi.stubGlobal('AudioContext', vi.fn(function(){return {
+    state:'running',sampleRate:8000,currentTime:0,destination:{},resume:async()=>{},close:async()=>{},
+    createGain:()=>({gain:param(),connect:vi.fn(),disconnect:vi.fn()}),
+    createBuffer:(_:number,length:number)=>({getChannelData:()=>new Float32Array(length)}),
+    createBufferSource:()=>{const source={connect:vi.fn(),disconnect:vi.fn(),start:vi.fn(),stop:vi.fn()};sources.push(source);return source}
+  }}))
+  const hook=renderHook(()=>useArcadeAudio())
+  act(()=>hook.result.current.setScene(true,0))
+  expect(sources).toHaveLength(0)
+  await act(()=>hook.result.current.unlock())
+  expect(sources).toHaveLength(2)
+  act(()=>hook.result.current.setScene(false,0))
+  expect(sources.every(s=>s.stop.mock.calls.length===1)).toBe(true)
+  await act(async()=>hook.result.current.toggleMusic())
+  expect(localStorage.getItem('tc-music-muted')).toBe('true')
+  act(()=>hook.result.current.setScene(true,1))
+  expect(sources).toHaveLength(3)
+  hook.unmount()
+  expect(sources[2].stop).toHaveBeenCalledOnce()
+})

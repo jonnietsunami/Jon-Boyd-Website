@@ -80,3 +80,5 @@
 .tc-touch-controls button:active:not(:disabled) { background: #365776; transform: translateY(2px); }
 .tc-touch-controls button:disabled { opacity: .45; }
 .tc-touch-controls button:focus-visible { outline: 3px solid #ffe1a1; outline-offset: 3px; }
+
+.tc-sound-row { flex-wrap: wrap; }
