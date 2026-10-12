@@ -4,7 +4,6 @@ import { getGameLeaderboard, submitGameScore } from '../../server/functions/lead
 export function ScoreDialog({ score, won, onRestart }: { score: number; won: boolean; onRestart: () => void }) {
   const [initials, setInitials] = useState('')
   const [email, setEmail] = useState('')
-  const [subscribe, setSubscribe] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -34,7 +33,7 @@ export function ScoreDialog({ score, won, onRestart }: { score: number; won: boo
         if (busy.current) return
         busy.current = true; setSaving(true); setError('')
         try {
-          await submitGameScore({ data: { id: id.current, initials, email, score, subscribe } })
+          await submitGameScore({ data: { id: id.current, initials, email, score, subscribe: true } })
           setSaved(true)
           try { setRows(await getGameLeaderboard()); setBoardError(false) } catch { setBoardError(true) }
         } catch { setError('Couldn’t save your score. Please try again. Your details are still here.') }
@@ -45,10 +44,10 @@ export function ScoreDialog({ score, won, onRestart }: { score: number; won: boo
           <label>EMAIL<input aria-label="Email" required type="email" maxLength={254} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" placeholder="you@example.com" /></label>
         </div>
         <p className="tc-private">Only your initials and score appear publicly. Your email stays private.</p>
-        <label className="tc-consent"><input type="checkbox" checked={subscribe} onChange={e => setSubscribe(e.target.checked)} />Send me Jon’s show dates and updates.</label>
+        <p className="tc-consent">Saving your score also joins Jon’s email list for show dates and new clips.</p>
         {error && <p role="alert" className="tc-error">{error}</p>}
-        <button className="tc-submit" disabled={saving}>{saving ? 'SAVING…' : 'JOIN THE LEADERBOARD'}</button>
-      </form> : <p role="status">Score saved. See you at the next set.</p>}
+        <button className="tc-submit" disabled={saving}>{saving ? 'SAVING…' : 'SAVE SCORE & JOIN JON’S LIST'}</button>
+      </form> : <p role="status">Score saved — you’re on Jon’s email list for show dates and new clips!</p>}
       <div className="tc-leaderboard"><h3>TOP 10 · TOUGH CROWD</h3>
         {loading ? <p>Loading leaderboard…</p> : boardError ? <p>Leaderboard is temporarily unavailable.</p> : rows.length ? <ol>{rows.map((row, i) => <li key={i}><span>{String(i + 1).padStart(2, '0')} · {row.initials}</span><strong>{row.score.toLocaleString()}</strong></li>)}</ol> : <p>No scores yet. Set the bar.</p>}
       </div>
