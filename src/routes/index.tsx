@@ -27,6 +27,7 @@ const socialIcons: Record<string, React.ComponentType<{ className?: string }>> =
 function HomePage() {
   const { content, socialLinks } = Route.useLoaderData()
   const [email, setEmail] = useState('')
+  const [city, setCity] = useState('')
   const [website, setWebsite] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -109,6 +110,13 @@ function HomePage() {
 
             <form onSubmit={handleSubscribe} className="w-full md:w-auto">
               <div className="flex items-center bg-white/10 border border-white/20 rounded-full pl-5 pr-1.5 py-1.5">
+                <input
+                  type="text"
+                  placeholder="Where you at?"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="bg-transparent text-white placeholder:text-white/50 text-sm outline-none w-full md:w-52"
+                />
                 <input
                   type="email"
                   placeholder="Enter your email"
