@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Instagram, Youtube, Twitter } from 'lucide-react'
+import { Instagram, Youtube, Twitter, Gamepad2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { getSiteContent } from '../server/functions/content'
@@ -66,7 +66,15 @@ function HomePage() {
             alt="Boyd!"
             className="h-10 md:h-12 w-auto mix-blend-lighten hover:scale-105 transition-transform"
           />
-          <div className="flex gap-4">
+          <div className="flex items-center gap-4">
+            <Link
+              to="/game"
+              aria-label="Play Tough Crowd"
+              title="Play Tough Crowd"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center text-white/70 hover:text-white transition-colors rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+            >
+              <Gamepad2 className="w-6 h-6" aria-hidden="true" />
+            </Link>
             {socialLinks.map((link) => {
               const Icon = socialIcons[link.platform.toLowerCase()]
               return Icon ? (
@@ -75,7 +83,7 @@ function HomePage() {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-white/70 hover:text-white transition-colors"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-white/70 hover:text-white transition-colors"
                 >
                   <Icon className="w-6 h-6" />
                 </a>
